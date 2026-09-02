@@ -279,6 +279,7 @@ module.exports = {
     showNameOnTiles: true
   },
   linux: {
+    icon: 'assets/icons',
     category: 'Development',
     maintainer: 'Nous Research <support@nousresearch.com>',
     synopsis: light
