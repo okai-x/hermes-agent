@@ -285,6 +285,7 @@
       "signAndEditExecutable": false
     },
     "linux": {
+      "icon": "assets/icons",
       "category": "Development",
       "maintainer": "Nous Research <support@nousresearch.com>",
       "synopsis": "Native desktop shell for Hermes Agent.",
