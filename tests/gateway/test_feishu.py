@@ -2227,6 +2227,74 @@ class TestFeishuProcessInboundMessage(unittest.TestCase):
         adapter._dispatch_inbound_event = AsyncMock()
         return adapter
 
+    def test_quote_reply_keeps_root_as_context_without_becoming_a_thread(self):
+        adapter = self._build_adapter()
+        build_source = Mock(return_value=SimpleNamespace(thread_id=None))
+        dispatch_inbound_event = AsyncMock()
+        adapter.build_source = build_source
+        adapter._dispatch_inbound_event = dispatch_inbound_event
+        adapter._fetch_message_text = AsyncMock(return_value="quoted message")
+        message = SimpleNamespace(
+            content=json.dumps({"text": "show the latest quota"}),
+            message_type="text",
+            message_id="om_current",
+            mentions=[],
+            chat_id="oc_dm",
+            parent_id=None,
+            upper_message_id=None,
+            root_id="om_quoted_card",
+            thread_id=None,
+        )
+
+        asyncio.run(
+            adapter._process_inbound_message(
+                data=message,
+                message=message,
+                sender_id=None,
+                chat_type="p2p",
+                message_id=message.message_id,
+            )
+        )
+
+        await_args = dispatch_inbound_event.await_args
+        assert await_args is not None
+        event = await_args.args[0]
+        call_args = build_source.call_args
+        assert call_args is not None
+        self.assertIsNone(call_args.kwargs["thread_id"])
+        self.assertEqual(event.reply_to_message_id, "om_quoted_card")
+        self.assertEqual(event.reply_to_text, "quoted message")
+
+    def test_topic_reply_preserves_explicit_thread_id(self):
+        adapter = self._build_adapter()
+        build_source = Mock(return_value=SimpleNamespace(thread_id="omt_topic"))
+        adapter.build_source = build_source
+        message = SimpleNamespace(
+            content=json.dumps({"text": "continue in topic"}),
+            message_type="text",
+            message_id="om_topic_reply",
+            mentions=[],
+            chat_id="oc_dm",
+            parent_id=None,
+            upper_message_id=None,
+            root_id="om_topic_root",
+            thread_id="omt_topic",
+        )
+
+        asyncio.run(
+            adapter._process_inbound_message(
+                data=message,
+                message=message,
+                sender_id=None,
+                chat_type="p2p",
+                message_id=message.message_id,
+            )
+        )
+
+        call_args = build_source.call_args
+        assert call_args is not None
+        self.assertEqual(call_args.kwargs["thread_id"], "omt_topic")
+
 
     def test_non_command_message_with_mentions_injects_hint(self):
         from gateway.platforms.base import MessageType
