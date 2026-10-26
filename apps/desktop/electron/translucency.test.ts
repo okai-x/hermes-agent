@@ -26,6 +26,7 @@ import {
   glassSupportedOn,
   glassSurfaceKeep,
   hudFrostFor,
+  nativeWindowOpacity,
   normalizeBook,
   normalizeMaterial,
   normalizeMode,
@@ -493,13 +494,13 @@ describe('windowBackgroundMaterialOptions', () => {
 // moment it lost focus. The no-op ask has to not be made.
 describe('windowOpacityOptions', () => {
   it('omits opacity entirely when the window is fully opaque', () => {
-    expect(windowOpacityOptions(glass(60))).toStrictEqual({})
-    expect(windowOpacityOptions(clear(0))).toStrictEqual({})
+    expect(windowOpacityOptions(glass(60), true)).toStrictEqual({})
+    expect(windowOpacityOptions(clear(0), true)).toStrictEqual({})
   })
 
   it('passes it the moment the state actually fades', () => {
     for (const state of [clear(1), clear(100), glass(60, DEFAULT_GLASS_MATERIAL, 1)]) {
-      expect(windowOpacityOptions(state)).toStrictEqual({ opacity: windowOpacityFor(state) })
+      expect(windowOpacityOptions(state, true)).toStrictEqual({ opacity: windowOpacityFor(state) })
     }
   })
 
@@ -510,8 +511,31 @@ describe('windowOpacityOptions', () => {
     for (const appearance of ['light', 'dark'] as const) {
       const state = { ...defaultTranslucencyValues(appearance, true), mode: 'glass' as const }
 
-      expect(windowOpacityOptions(state), appearance).toStrictEqual({})
+      expect(windowOpacityOptions(state, true), appearance).toStrictEqual({})
     }
+  })
+})
+
+// Electron documents setOpacity as a Linux no-op, but on X11 it writes
+// _NET_WM_WINDOW_OPACITY and Mutter honours it. Linux lands on 'clear' with the
+// shared default intensity, which used to fade every window to ~0.94 with the
+// Settings row hidden and no way back.
+describe('a platform without translucency', () => {
+  const linuxDefault = defaultTranslucencyState('light', glassSupportedOn('linux'), false)
+
+  it('starts from a state that would fade the window', () => {
+    expect(windowOpacityFor(linuxDefault)).toBeLessThan(1)
+  })
+
+  it('keeps every chat window natively opaque', () => {
+    for (const state of [linuxDefault, clear(100), glass(60, DEFAULT_GLASS_MATERIAL, 40)]) {
+      expect(nativeWindowOpacity(state, false)).toBe(1)
+      expect(windowOpacityOptions(state, false)).toStrictEqual({})
+    }
+  })
+
+  it('still fades where the setting exists', () => {
+    expect(nativeWindowOpacity(clear(29), true)).toBe(windowOpacityFor(clear(29)))
   })
 })
 

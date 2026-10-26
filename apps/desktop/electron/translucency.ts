@@ -142,11 +142,21 @@ export function opacityNeedsSetting(next: number, current = 1): boolean {
 }
 
 /**
+ * The native opacity a chat window should carry. Platforms without the
+ * translucency setting stay opaque: Electron documents setOpacity as a no-op on
+ * Linux, but on X11 it writes _NET_WM_WINDOW_OPACITY and the compositor honours
+ * it — and Settings hides the row there, so a fade would have no way back.
+ */
+export function nativeWindowOpacity(state: TranslucencyState, translucencySupported: boolean): number {
+  return translucencySupported ? windowOpacityFor(state) : 1
+}
+
+/**
  * BrowserWindow constructor options for a chat window's native opacity. Empty
  * unless the state actually asks the window to fade — see opacityNeedsSetting.
  */
-export function windowOpacityOptions(state: TranslucencyState): { opacity?: number } {
-  const opacity = windowOpacityFor(state)
+export function windowOpacityOptions(state: TranslucencyState, translucencySupported: boolean): { opacity?: number } {
+  const opacity = nativeWindowOpacity(state, translucencySupported)
 
   return opacityNeedsSetting(opacity) ? { opacity } : {}
 }
