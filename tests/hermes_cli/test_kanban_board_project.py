@@ -7,6 +7,7 @@ metadata round-trip and the create-time inheritance.
 
 from __future__ import annotations
 
+import subprocess
 import sys
 from pathlib import Path
 
@@ -94,6 +95,7 @@ def test_create_task_explicit_scratch_beats_board(fresh_home, tmp_path):
     scratch, while an omitted kind still inherits the project worktree."""
     repo = tmp_path / "repo"
     repo.mkdir()
+    subprocess.run(["git", "init", "-q", str(repo)], check=True, capture_output=True)
     with pdb.connect_closing() as pconn:
         proj_id = pdb.create_project(pconn, name="Widget", primary_path=str(repo))
 
@@ -105,5 +107,23 @@ def test_create_task_explicit_scratch_beats_board(fresh_home, tmp_path):
         assert (scratch.workspace_kind, scratch.project_id) == ("scratch", None)
         default = kb.get_task(conn, kb.create_task(conn, title="default", board="scoped3"))
         assert (default.workspace_kind, default.project_id) == ("worktree", proj_id)
+    finally:
+        conn.close()
+
+
+def test_board_scoped_to_plain_folder_project_runs_in_place(fresh_home, tmp_path):
+    """A board bound to a project whose folder is not a git repo: new tasks keep the
+    project link but work in the folder, not in a worktree git cannot create."""
+    folder = tmp_path / "notes"
+    folder.mkdir()
+    with pdb.connect_closing() as pconn:
+        proj_id = pdb.create_project(pconn, name="Notes", primary_path=str(folder))
+
+    kb.create_board("notes", name="Notes", project_id=proj_id)
+    conn = kbc.connect(board="notes")
+    try:
+        task = kb.get_task(conn, kb.create_task(conn, title="read", board="notes"))
+        assert (task.workspace_kind, task.workspace_path, task.project_id) == ("dir", str(folder), proj_id)
+        assert task.branch_name is None
     finally:
         conn.close()
